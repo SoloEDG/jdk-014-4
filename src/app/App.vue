@@ -16,6 +16,11 @@ import { ChapterPanel } from "../features/chapters";
 import { ReaderStage, PanelStrip } from "../features/reader";
 import { AudioPanel } from "../features/audio";
 import { ProgressPanel } from "../features/progress";
+import {
+  SessionPanel,
+  PlaybackBar,
+  ConfirmDialog,
+} from "../features/sessions";
 import { useWorkspace } from "./workspace";
 const {
   doc,
@@ -24,6 +29,8 @@ const {
   library: l,
   chapters: c,
   audio: a,
+  sessions: s,
+  removeChapter,
 } = useWorkspace();
 const current = r.current,
   at = r.location,
@@ -32,6 +39,9 @@ const current = r.current,
   bookmarks = p.bookmarks,
   status = p.status,
   cue = a.cue;
+const activeSession = computed(() =>
+  s.sessions.value.find((item) => item.id === s.playback.activeId.value),
+);
 const chapterIndex = computed(
   () => doc.value.chapters.findIndex((c) => c.id === at.value.chapterId) + 1,
 );
@@ -83,7 +93,7 @@ function focus(id: string) {
           @select="r.dispatch({ type: 'chapter', id: $event })"
           @rename="c.begin"
           @move="c.move"
-          @remove="c.remove"
+          @remove="removeChapter"
           @draft="c.draft.value = $event"
           @save="c.rename"
         /><LibraryPanel
@@ -129,6 +139,18 @@ function focus(id: string) {
             </button>
           </div>
         </div>
+        <PlaybackBar
+          v-if="activeSession"
+          :title="activeSession.title"
+          :playing="s.playback.playing.value"
+          :time="s.playback.time.value"
+          :duration="s.playback.duration.value"
+          :progress="s.playback.progress.value"
+          :report="s.playback.report.value"
+          @toggle="s.playback.toggle"
+          @seek="s.playback.seek"
+          @close="s.playback.close"
+        />
         <ReaderStage
           v-if="current.page && current.panel"
           :page="current.page"
@@ -173,6 +195,25 @@ function focus(id: string) {
           @remove="p.remove"
           @restore="r.dispatch({ type: 'restore', location: $event })"
         />
+        <SessionPanel
+          :sessions="s.sessions.value"
+          :reports="s.reports.value"
+          :current-revision="s.currentRevision.value"
+          :recording="s.recorder.recording.value"
+          :paused="s.recorder.paused.value"
+          :clock="s.recorder.clock.value"
+          :event-count="s.recorder.eventCount.value"
+          :active-id="s.playback.activeId.value"
+          :status="s.status.value"
+          @start="s.recorder.start"
+          @pause="s.recorder.pauseRecording"
+          @resume="s.recorder.resumeRecording"
+          @save="s.saveRecording"
+          @discard="s.discardRecording"
+          @replay="s.recorder.markReplay"
+          @open="s.playback.open"
+          @remove="s.removeSession"
+        />
         <div class="reading-tip">
           <span>✦ 阅读小贴士</span>
           <p>试试逐格模式，让画面与声音<br />带你走进故事的深处。</p>
@@ -186,5 +227,11 @@ function focus(id: string) {
       ><span>PANEL · 为每一格想象而生</span
       ><span>图片导入 · 本地存储 · 无需联网</span>
     </footer>
+    <ConfirmDialog
+      v-if="s.confirmRequest.value"
+      :request="s.confirmRequest.value"
+      @confirm="s.confirmRequest.value?.onConfirm()"
+      @cancel="s.cancelConfirm"
+    />
   </div>
 </template>
